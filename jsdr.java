@@ -27,6 +27,7 @@ import javax.sound.sampled.Mixer;
 import javax.sound.sampled.TargetDataLine;
 
 import java.util.Properties;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 
@@ -49,12 +50,15 @@ public class jsdr implements Runnable {
 
 	protected JFrame frame;
 	protected JLabel status;
+	protected JLabel scanner;
 	protected JTabbedPane tabs;
 	protected int ic, qc;
 	private AudioFormat format;
 	private int bufsize;
 	private FCD fcd;
 	private int freq;
+	private File fscan;
+	private float lastMax;
 	private boolean done;
 
 	public static String getConfig(String prop, String def) {
@@ -136,6 +140,11 @@ public class jsdr implements Runnable {
 					f = freq+50;
 				} else if ('S'==c) {
 					f = freq-50;
+				} else if ('@'==c) {
+					if (confirmScan()) {
+						f = freq;
+						lastMax = -1;
+					}
 				}
 				if (f>=50000) {
 					freq = f;
@@ -166,11 +175,16 @@ public class jsdr implements Runnable {
 			KeyStroke.getKeyStroke('s'), "Key");
 		frame.getLayeredPane().getInputMap(JPanel.WHEN_IN_FOCUSED_WINDOW).put(
 			KeyStroke.getKeyStroke('S'), "Key");
+		frame.getLayeredPane().getInputMap(JPanel.WHEN_IN_FOCUSED_WINDOW).put(
+			KeyStroke.getKeyStroke('@'), "Key");
 		frame.getLayeredPane().getActionMap().put("Key", act);
 
 		// status bar
 		status = new JLabel(frame.getTitle());
 		controls.add(status, BorderLayout.SOUTH);
+		// Temporary scanner info
+		scanner = new JLabel("scan info..");
+		controls.add(scanner, BorderLayout.NORTH);
 		// Close handler
 		frame.addWindowListener(new WindowAdapter() {
 			public void windowClosing(WindowEvent e) {
@@ -180,6 +194,7 @@ public class jsdr implements Runnable {
 		// Done - show it!
 		frame.setVisible(true);
 		// Start audio thread
+		fscan = null;
 		done = false;
 		ic = getIntConfig(CFG_ICORR, 0);
 		qc = getIntConfig(CFG_QCORR, 0);
@@ -189,7 +204,8 @@ public class jsdr implements Runnable {
 	private int freqDialog() {
 		if (fcd!=null) {
 			try {
-				String tune = JOptionPane.showInputDialog(frame, "Please enter new frequency");
+				String tune = JOptionPane.showInputDialog(frame, "Please enter new frequency",
+					frame.getTitle(), JOptionPane.QUESTION_MESSAGE);
 				return Integer.parseInt(tune);
 			} catch (Exception e) {
 				status.setText("Invalid frequency");
@@ -200,10 +216,27 @@ public class jsdr implements Runnable {
 		return -1;
 	}
 
+	private boolean confirmScan() {
+		try {
+			String msg = (fscan!=null) ? "Stop scan?" : "Scan from here?";
+			int yn = JOptionPane.showConfirmDialog(frame, msg,
+				frame.getTitle(), JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+			if (0==yn) {
+				if (fscan!=null)
+					fscan = null;
+				else {
+					fscan = new File("scan.log");
+					fscan.delete();
+					return true;
+				}
+			}
+		} catch (Exception e) {}
+		return false;
+	}
+
 	private void fcdSetFreq(int f) {
-		freq = f;
 		if (fcd.FME_APP!=fcd.fcdAppSetFreqkHz(freq))
-			status.setText("unable to tune FCD");
+			status.setText("Unable to tune FCD");
 		else
 			status.setText("FCD tuned to "+freq+" kHz");
 	}
@@ -236,7 +269,7 @@ public class jsdr implements Runnable {
 				try {
 					line = (TargetDataLine) AudioSystem.getTargetDataLine(format, mixers[m]);
 				} catch (Exception e) {
-					status.setText("unable to open audio device: "+dev);
+					status.setText("Unable to open audio device: "+dev);
 				}
 				break;
 			}
@@ -254,6 +287,14 @@ public class jsdr implements Runnable {
 					buf.clear();
 					int n = line.read(tmp, 0, tmp.length);
 					buf.put(tmp);
+					if (fscan!=null) {		// Retune ASAP after each buffer..
+						if (freq<2000000) {
+							fcdSetFreq(freq+100);
+						} else {
+							fscan = null;
+							status.setText("Scan complete!");
+						}
+					}
 					for (int t=0; t<tabs.getTabCount(); t++) {
 						Object o = tabs.getComponentAt(t);
 						if (o instanceof JsdrTab) {
@@ -261,6 +302,8 @@ public class jsdr implements Runnable {
 							((JsdrTab)o).newBuffer(buf);
 						}
 					}
+					if (fscan!=null)	// After callbacks, to avoid skew
+						freq += 100;
 				}
 				status.setText("Audio input done");
 			} catch (Exception e) {
@@ -269,6 +312,27 @@ public class jsdr implements Runnable {
 			}
 		} else {
 			status.setText("Unable to open audio");
+		}
+	}
+
+	// Callback used by fft module to pass up maxima from each buffer
+	public void spectralMaxima(float max) {
+		// If scanning, save maxima against freq..
+		if (fscan!=null) {
+			try {
+				String s = "" + System.currentTimeMillis()/1000 + ", " + freq + ", " + max + "\n";
+				FileOutputStream fs = new FileOutputStream(fscan, true);
+				fs.write(s.getBytes());
+				fs.close();
+			} catch (Exception e) {
+				fscan = null;
+				status.setText("Scan aborted, cannot write log");
+			}
+			if (max>lastMax) {
+				scanner.setText("Last maxima: freq: " + freq + " max: " + max);
+				lastMax = max;
+				saveConfig();
+			}
 		}
 	}
 
@@ -293,7 +357,7 @@ public class jsdr implements Runnable {
 			config.load(cfi);
 			cfi.close();
 		} catch (Exception e) {
-			System.err.println("unable to load config, using defaults");
+			System.err.println("Unable to load config, using defaults");
 		}
 		// Get the UI up as soon as possible, we might need to display errors..
 		SwingUtilities.invokeLater(new Runnable() {

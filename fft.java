@@ -126,6 +126,8 @@ public class fft extends JPanel implements jsdr.JsdrTab {
 		}
 		// Stash maxima for scaling display
 		spc[spc.length-1] = m;
+		// Upcall for scanner
+		parent.spectralMaxima(m);
 		//final int spos = p;
 		//System.out.println("max FFT value="+m+" @"+p);
 		repaint();
