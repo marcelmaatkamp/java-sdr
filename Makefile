@@ -10,7 +10,7 @@ CLASSPATH=$(FCDAPI):$(JTRANS):$(JNALIB)
 all: bin/jsdr.jar
 
 clean:
-	rm -rf bin
+	rm -rf bin *~
 
 bin/jsdr.jar: $(CLASSES) JSDR.MF
 	sed -e 's^CLASSPATH^$(FCDAPI) $(JTRANS) $(JNALIB)^' <JSDR.MF >bin/temp.mf

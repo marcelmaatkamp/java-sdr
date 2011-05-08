@@ -56,7 +56,7 @@ public class jsdr implements Runnable {
 	private AudioFormat format;
 	private int bufsize;
 	private FCD fcd;
-	private int freq;
+	private int freq, lastfreq;
 	private File fscan;
 	private float lastMax;
 	private boolean done;
@@ -147,7 +147,6 @@ public class jsdr implements Runnable {
 					}
 				}
 				if (f>=50000) {
-					freq = f;
 					fcdSetFreq(f);
 				}
 				saveConfig();
@@ -235,7 +234,8 @@ public class jsdr implements Runnable {
 	}
 
 	private void fcdSetFreq(int f) {
-		if (fcd.FME_APP!=fcd.fcdAppSetFreqkHz(freq))
+		lastfreq = freq;
+		if (fcd.FME_APP!=fcd.fcdAppSetFreqkHz(freq=f))
 			status.setText("Unable to tune FCD");
 		else
 			status.setText("FCD tuned to "+freq+" kHz");
@@ -302,8 +302,6 @@ public class jsdr implements Runnable {
 							((JsdrTab)o).newBuffer(buf);
 						}
 					}
-					if (fscan!=null)	// After callbacks, to avoid skew
-						freq += 100;
 				}
 				status.setText("Audio input done");
 			} catch (Exception e) {
@@ -320,7 +318,7 @@ public class jsdr implements Runnable {
 		// If scanning, save maxima against freq..
 		if (fscan!=null) {
 			try {
-				String s = "" + System.currentTimeMillis()/1000 + ", " + freq + ", " + max + "\n";
+				String s = "" + System.currentTimeMillis()/1000 + "," + lastfreq + "," + max + "\n";
 				FileOutputStream fs = new FileOutputStream(fscan, true);
 				fs.write(s.getBytes());
 				fs.close();
