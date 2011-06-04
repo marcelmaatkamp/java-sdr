@@ -7,6 +7,7 @@ import java.awt.Graphics;
 import java.awt.Color;
 import javax.swing.JPanel;
 
+@SuppressWarnings("serial")
 public class phase extends JPanel implements jsdr.JsdrTab {
 
 	private jsdr parent;

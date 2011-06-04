@@ -1,14 +1,14 @@
-// Yay for JTransforms - the fastest Java FFT so far :)
-import edu.emory.mathcs.jtransforms.fft.FloatFFT_1D;
+import java.awt.Color;
+import java.awt.Graphics;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 import javax.sound.sampled.AudioFormat;
-
 import javax.swing.JPanel;
-import java.awt.Graphics;
-import java.awt.Color;
 
+//Yay for JTransforms - the fastest Java FFT so far :)
+import edu.emory.mathcs.jtransforms.fft.FloatFFT_1D;
+
+@SuppressWarnings("serial")
 public class fft extends JPanel implements jsdr.JsdrTab {
 	private jsdr parent;
 	private float[] dat;
@@ -37,8 +37,13 @@ public class fft extends JPanel implements jsdr.JsdrTab {
 		for (int x=mxs; x<getWidth()-1; x+=mxs) {
 			g.drawLine(x, my1, x, my2);
 		}
-		g.drawString("-48kHz", 2, getHeight()*2/3-2);
-		g.drawString("+48kHz", getWidth()-50, getHeight()*2/3-2);
+		if (fmt.getChannels()<2) {
+			g.drawString("0 Hz", 2, getHeight()*2/3-2);
+			g.drawString(""+fmt.getSampleRate()/2+"Hz", getWidth()-50, getHeight()*2/3-2);
+		} else {
+			g.drawString("-"+fmt.getSampleRate()/2+"Hz", 2, getHeight()*2/3-2);
+			g.drawString("+"+fmt.getSampleRate()/2+"Hz", getWidth()-80, getHeight()*2/3-2);
+		}
 		// Step size for resampling to screen size
 		float s = (float)(dat.length/2)/(float)getWidth();
 		int t = (int)Math.ceil(s);
@@ -72,9 +77,15 @@ public class fft extends JPanel implements jsdr.JsdrTab {
 		o = getHeight();
 		h = (getHeight()/3)/spc[spc.length-1];
 		ly = 0;
+		int off = getWidth()/2;
+		// adjust scale and offset if only single channel data
+		if (fmt.getChannels()<2) {
+			s = s/2;
+			off = 0;
+		}
 		for (int p=0; p<getWidth()-1; p++) {
 			// offset and wrap index to display negative freqs, then positives..
-			int i = (p+getWidth()/2) % getWidth();
+			int i = (p+off) % getWidth();
 			int y = (int)(getMax(spc, 2*(int)(i*s), t)*h);
 			g.drawLine(p, o-ly, p+1, o-y);
 			ly = y;
@@ -94,11 +105,7 @@ public class fft extends JPanel implements jsdr.JsdrTab {
 	}
 
 	public void newBuffer(ByteBuffer buf) {
-		// Skip unless we are visible
-		if (!isVisible())
-			return;
 		// Convert to array of floats (scaled -1 to 1)..
-		//System.out.println("converting.."+n);
 		int div = 2<<(fmt.getSampleSizeInBits()-1);
 		for (int s=0; s<dat.length; s+=2) {
 			dat[s]   = (float)(buf.getShort()+parent.ic) / (float)div;
@@ -110,11 +117,9 @@ public class fft extends JPanel implements jsdr.JsdrTab {
 		// Copy to preserve original input
 		System.arraycopy(dat, 0, spc, 0, dat.length);
 		// FFT
-		//System.out.println("transforming length="+spc.length/2);
 		FloatFFT_1D fft = new FloatFFT_1D(spc.length/2);
 		fft.complexForward(spc);
 		// Calculate power spectral density (PSD)
-		//System.out.println("displaying..");
 		float m = 0;
 		int p = -1;
 		for (int s=0; s<spc.length-1; s+=2) {
@@ -127,9 +132,9 @@ public class fft extends JPanel implements jsdr.JsdrTab {
 		// Stash maxima for scaling display
 		spc[spc.length-1] = m;
 		// Upcall for scanner
-		parent.spectralMaxima(m);
-		//final int spos = p;
-		//System.out.println("max FFT value="+m+" @"+p);
-		repaint();
+		parent.spectralMaxima(m, p);
+		// Skip redraw unless we are visible
+		if (isVisible())
+			repaint();
 	}
 }

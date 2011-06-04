@@ -1,38 +1,31 @@
 // Swing based display framework for SDR, just a frame with some tabs to select
 // display format, and the FCD input config/thread.
-import javax.swing.SwingUtilities;
-import javax.swing.JFrame;
-import javax.swing.JPanel;
-import javax.swing.JLabel;
-import javax.swing.JTabbedPane;
-import javax.swing.JSplitPane;
-import javax.swing.JOptionPane;
-import javax.swing.KeyStroke;
-import javax.swing.AbstractAction;
-import javax.swing.event.ChangeListener;
-import javax.swing.event.ChangeEvent;
-import java.awt.Graphics;
-import java.awt.Color;
 import java.awt.BorderLayout;
+import java.awt.event.ActionEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.awt.event.ActionEvent;
-import java.awt.event.KeyEvent;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.Properties;
 
-// FUNcube Dongle API
-import uk.org.funcube.fcdapi.FCD;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Mixer;
 import javax.sound.sampled.TargetDataLine;
+import javax.swing.AbstractAction;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JSplitPane;
+import javax.swing.JTabbedPane;
+import javax.swing.KeyStroke;
+import javax.swing.SwingUtilities;
 
-import java.util.Properties;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+import uk.org.funcube.fcdapi.FCD;
 
 public class jsdr implements Runnable {
 
@@ -79,6 +72,7 @@ public class jsdr implements Runnable {
 		return def;
 	}
 
+	@SuppressWarnings("serial")
 	private jsdr() {
 		// The audio format
 		int rate = getIntConfig(CFG_AUDRAT, 96000);	// Default 96kHz sample rate
@@ -105,7 +99,7 @@ public class jsdr implements Runnable {
 		// The tabbed display panes (in top)
 		tabs = new JTabbedPane(JTabbedPane.BOTTOM);
 		split.setTopComponent(tabs);
-		// The content in each tab: TODO display classes..
+		// The content in each tab
 		tabs.add("Spectrum", new fft(this, format, bufsize));
 		tabs.add("Phase", new phase(this, format, bufsize));
 		// The control area (in bottom)
@@ -177,6 +171,14 @@ public class jsdr implements Runnable {
 		frame.getLayeredPane().getInputMap(JPanel.WHEN_IN_FOCUSED_WINDOW).put(
 			KeyStroke.getKeyStroke('@'), "Key");
 		frame.getLayeredPane().getActionMap().put("Key", act);
+		controls.add(new JLabel(
+				"<html><b>Hotkeys</b><br/>"+
+				"i/I and q/Q adjust DC offsets (up/Down)<br/>" +
+				"u/U tune up by 1/10kHz, d/D tune down by 1/10kHz<br/>" +
+				"s/S step up/down by 50kHz<br/>" +
+				"f enter frequency, @ start/stop scan" +
+				"</html>"
+				), BorderLayout.CENTER);
 
 		// status bar
 		status = new JLabel(frame.getTitle());
@@ -235,7 +237,7 @@ public class jsdr implements Runnable {
 
 	private void fcdSetFreq(int f) {
 		lastfreq = freq;
-		if (fcd.FME_APP!=fcd.fcdAppSetFreqkHz(freq=f))
+		if (null==fcd || FCD.FME_APP!=fcd.fcdAppSetFreqkHz(freq=f))
 			status.setText("Unable to tune FCD");
 		else
 			status.setText("FCD tuned to "+freq+" kHz");
@@ -248,7 +250,7 @@ public class jsdr implements Runnable {
 		if (dev.equals("FUNcube Dongle")) {
 			// FCD in use, we can tune it ourselves..
 			fcd = new FCD();
-			while (fcd.FME_APP!=fcd.fcdGetMode()) {
+			while (FCD.FME_APP!=fcd.fcdGetMode()) {
 				status.setText("FCD not present or not in app mode, resetting..");
 				fcd.fcdBlReset();
 				try {
@@ -285,7 +287,7 @@ public class jsdr implements Runnable {
 				line.start();
 				while (!done) {
 					buf.clear();
-					int n = line.read(tmp, 0, tmp.length);
+					line.read(tmp, 0, tmp.length);
 					buf.put(tmp);
 					if (fscan!=null) {		// Retune ASAP after each buffer..
 						if (freq<2000000) {
@@ -314,7 +316,7 @@ public class jsdr implements Runnable {
 	}
 
 	// Callback used by fft module to pass up maxima from each buffer
-	public void spectralMaxima(float max) {
+	public void spectralMaxima(float max, int pos) {
 		// If scanning, save maxima against freq..
 		if (fscan!=null) {
 			try {
@@ -360,7 +362,7 @@ public class jsdr implements Runnable {
 		// Get the UI up as soon as possible, we might need to display errors..
 		SwingUtilities.invokeLater(new Runnable() {
 			public void run() {
-				jsdr me = new jsdr();
+				new jsdr();
 			}
 		});
 	}
