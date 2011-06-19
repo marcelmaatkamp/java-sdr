@@ -1,0 +1,90 @@
+dependsOnChildren() 
+
+allprojects {
+
+  apply plugin: 'maven'
+  apply plugin: 'java'
+  apply plugin: 'groovy'
+  apply plugin: 'eclipse'
+  apply plugin: 'idea'
+
+  sourceCompatibility = 1.6
+  targetCompatibility = 1.6 
+  version = 0.2
+  
+  repositories {
+    if (hasProperty('repo')) {
+      localRepo=repo
+    } else {
+      localRepo="file://" + System.getProperty('user.home') + "/.m2/repository/"
+    }
+    mavenRepo urls: localRepo
+    mavenRepo(urls: "http://mirrors.ibiblio.org/pub/mirrors/")
+    mavenRepo(urls: "http://download.java.net/maven/2/")
+    mavenRepo(urls: "http://repository.codehaus.org")
+    mavenRepo(urls: "http://www.ibiblio.org/maven/mule/dependencies/maven2/")
+    mavenRepo(urls: "https://maven.nuxeo.org/nexus/content/groups/public/")
+    mavenRepo(urls: "http://source.mysema.com/maven2/releases")
+    mavenRepo(urls: "http://maven.springframework.org/snapshot")
+    mavenRepo(urls: "http://maven.springframework.org/milestone")
+    mavenRepo(urls: "http://oss.sonatype.org/content/repositories/releases/")
+    mavenRepo(urls: "http://oss.sonatype.org/content/repositories/snapshots/")
+    mavenRepo(urls: "http://oss.sonatype.org/content/repositories/milestones/")
+    mavenRepo(urls: "http://shrub.appspot.com/maven.springframework.org/release/")
+    mavenRepo(urls: "http://shrub.appspot.com/maven.springframework.org/milestones/")
+    mavenRepo(urls: "http://shrub.appspot.com/maven.springframework.org/snapshots/")
+    mavenRepo(urls: "http://maven.springframework.org.s3.amazonaws.com/release/")
+    mavenRepo(urls: "http://m2.neo4j.org/")
+    mavenRepo(urls: "http://repo.open.med.harvard.edu/nexus/content/repositories/thirdparty")
+    mavenRepo(urls: "http://signalml.org/maven/repository")
+
+    mavenCentral()
+  }
+  dependencies {
+
+    compile files(fileTree(dir: 'lib', includes: ['*.jar'])) 
+
+    groovy group: 'org.codehaus.groovy', name: 'groovy', version: '1.7.10'
+    testCompile group: 'junit', name: 'junit', version: '4.7'
+
+    compile "edu.emory.mathcs:jtransforms:2.3"
+    compile "net.java.dev.jna:jna:3.3.0"
+
+    // compile "org.springframework.data:spring-data-mongodb:1.0.0.M1"
+    // compile("org.springframework.data:spring-data-redis:1.0.0.M2") {
+    //            exclude module:"jredis-anthonylauzon"
+    // }
+
+    // compile "org.aspectj:aspectjrt:1.6.10.RELEASE"
+    // compile "org.springframework.data:spring-data-neo4j:1.0.0.M4"
+    // compile "org.springframework.data:spring-data-jpa:1.0.0.M2"
+    // compile "xstream:xstream:1.2.2"
+    // compile "org.codehaus.jettison:jettison:1.2"
+    // compile "dnsjava:dnsjava:2.1.0"
+    // compile "mysql:mysql-connector-java:5.1.13"
+    // compile "org.slf4j:slf4j-api:1.6.1"
+    // compile "org.slf4j:slf4j-simple:1.6.1"
+    // compile "org.slf4j:slf4j-jdk14:1.6.1"
+    // compile "edu.stanford.nlp:stanford-ner:1.1.1"
+    // compile "edu.stanford.nlp:stanford-ner-models:1.1.1"
+
+    // compile "com.mysema.querydsl:querydsl-apt:2.1.2"
+    // compile "com.mysema.querydsl:querydsl-hql:1.9.7"
+
+    // compile "edu.stanford.nlp:stanford-ner:1.1.1"
+    // compile "edu.stanford.nlp:stanford-ner-models:1.1.1"
+    // compile "com.aliasi:lingpipe:4.0.1"
+    // compile "org.apache.xmlgraphics:fop:1.0"
+    // compile "org.apache.ivy:ivy:2.1.0"
+
+  }
+
+  defaultTasks "jsdr"
+  jar.exclude 'log4j.properties' 
+
+  task ("jsdr",dependsOn: 'classes', type: JavaExec) { 
+    main = "org.jsdr.Jsdr"
+    classpath = sourceSets.main.runtimeClasspath
+    maxHeapSize = "3G"
+  }
+}
